@@ -82,9 +82,10 @@ def train_classifier(
 
         scheduler.step()
 
-        # Evaluate
-        test_acc = evaluate_classifier(model, test_loader, device)
-        epoch_accuracies.append(test_acc)
+        # Only evaluate at final epoch (massive speedup)
+        if epoch == epochs - 1:
+            test_acc = evaluate_classifier(model, test_loader, device)
+            epoch_accuracies.append(test_acc)
 
         if verbose and (epoch + 1) % 20 == 0:
             avg_loss = train_loss / max(n_batches, 1)
