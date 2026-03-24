@@ -256,7 +256,7 @@ def train_flexmatch(
                         classwise_acc[c] = 0.999 * classwise_acc[c] + 0.001 * class_correct
 
         # ── Logging & evaluation ──
-        if verbose and (it + 1) % 500 == 0:
+        if verbose and (it + 1) % 100 == 0:
             mask_ratio = mask.mean().item()
             print(f"    Iter {it+1}/{total_iterations} | "
                   f"Loss_l: {loss_l.item():.3f} | Loss_u: {loss_u.item():.3f} | "
