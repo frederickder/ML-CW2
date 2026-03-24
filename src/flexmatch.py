@@ -193,6 +193,7 @@ def train_flexmatch(
 
     model.train()
     best_acc = 0.0
+    train_start = __import__('time').time()
 
     for it in range(total_iterations):
         # Get labeled batch
@@ -257,10 +258,15 @@ def train_flexmatch(
 
         # ── Logging & evaluation ──
         if verbose and (it + 1) % 100 == 0:
+            elapsed = __import__('time').time() - train_start
+            iters_done = it + 1
+            iters_left = total_iterations - iters_done
+            eta = elapsed / iters_done * iters_left
             mask_ratio = mask.mean().item()
-            print(f"    Iter {it+1}/{total_iterations} | "
+            print(f"    Iter {iters_done}/{total_iterations} | "
                   f"Loss_l: {loss_l.item():.3f} | Loss_u: {loss_u.item():.3f} | "
-                  f"Mask: {mask_ratio:.2f}",
+                  f"Mask: {mask_ratio:.2f} | "
+                  f"Elapsed: {elapsed/60:.1f}m | ETA: {eta/60:.1f}m",
                   flush=True)
         if verbose and (it + 1) % eval_every == 0:
             acc = evaluate(ema_model, test_loader, device)
