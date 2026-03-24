@@ -37,7 +37,7 @@ import matplotlib.pyplot as plt
 # CONFIG
 # ══════════════════════════════════════════════
 BUDGET = 10                   # 10 labeled examples (1 per class, Fig. 6a)
-FLEXMATCH_ITERATIONS = 25_000 # Paper: 400k — reduced for compute
+FLEXMATCH_ITERATIONS = 50_000 # Paper: 400k — reduced for compute
 N_REPS = 1                    # Paper: 3 — reduced for compute
 
 # Key comparison: Random vs TypiClust (core finding of the paper)
