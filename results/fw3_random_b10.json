@@ -1,0 +1,11 @@
+{
+  "strategy": "random",
+  "framework": "semi_supervised",
+  "budget": 10,
+  "iterations": 50000,
+  "accuracies": [
+    19.72
+  ],
+  "mean_accuracy": 19.72,
+  "std_accuracy": 0.0
+}

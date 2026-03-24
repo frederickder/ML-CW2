@@ -1,0 +1,11 @@
+{
+  "strategy": "typiclust",
+  "framework": "semi_supervised",
+  "budget": 10,
+  "iterations": 50000,
+  "accuracies": [
+    15.92
+  ],
+  "mean_accuracy": 15.92,
+  "std_accuracy": 0.0
+}
