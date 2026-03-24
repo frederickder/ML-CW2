@@ -148,18 +148,23 @@ def train_flexmatch(
         labeled_ds,
         batch_size=min(batch_size, len(labeled_indices)),
         shuffle=True,
-        num_workers=0,
+        num_workers=4,
         drop_last=False,
+        persistent_workers=True,
+        pin_memory=True,
     )
     unlabeled_loader = DataLoader(
         unlabeled_ds,
         batch_size=batch_size * mu,
         shuffle=True,
-        num_workers=0,
+        num_workers=4,
         drop_last=True,
+        persistent_workers=True,
+        pin_memory=True,
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=256, shuffle=False, num_workers=0
+        test_dataset, batch_size=256, shuffle=False, num_workers=4,
+        persistent_workers=True, pin_memory=True,
     )
 
     # ── Model ──
