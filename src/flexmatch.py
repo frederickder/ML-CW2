@@ -5,11 +5,10 @@ FlexMatch: Boosting Semi-Supervised Learning with Curriculum Pseudo Labeling
 Minimal but correct implementation for Framework 3 of Hacohen et al. (2022).
 
 FlexMatch extends FixMatch by using per-class adaptive confidence thresholds
-(Curriculum Pseudo Labeling) instead of a fixed threshold. Classes that are
-easier to learn get higher thresholds, while harder classes get lower ones.
+(Curriculum Pseudo Labeling) instead of a fixed threshold.
 
 Paper config (Appendix F.2.3):
-  - WideResNet-28-2, 400k iterations (we use 100k, discussed in report)
+  - WideResNet-28-2, 400k iterations (we use 25k, discussed in report)
   - SGD, lr=0.03, momentum=0.9, weight_decay=0.0005
   - Batch size: 64 labeled, 64*7=448 unlabeled (mu=7)
   - Weak aug: random crop + horizontal flip
@@ -22,8 +21,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset, Subset, RandomSampler
+from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
+from PIL import Image
 
 from .wideresnet import WideResNet
 
@@ -31,31 +31,6 @@ from .wideresnet import WideResNet
 # ──────────────────────────────────────────────
 # Augmentations
 # ──────────────────────────────────────────────
-
-class RandAugment:
-    """Simplified RandAugment for strong augmentation."""
-    def __init__(self, n=2, m=10):
-        self.n = n
-        self.m = m
-        self.augment_list = [
-            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-            transforms.RandomAffine(degrees=30),
-            transforms.RandomAffine(degrees=0, shear=15),
-            transforms.ColorJitter(brightness=0.4),
-            transforms.ColorJitter(contrast=0.4),
-            transforms.ColorJitter(saturation=0.4),
-            transforms.RandomAutocontrast(),
-            transforms.RandomEqualize(),
-            transforms.RandomPosterize(bits=4),
-            transforms.RandomSolarize(threshold=128),
-        ]
-
-    def __call__(self, img):
-        ops = np.random.choice(self.augment_list, self.n, replace=False)
-        for op in ops:
-            img = op(img)
-        return img
-
 
 def get_weak_transform():
     """Weak augmentation: random crop + horizontal flip."""
@@ -73,7 +48,7 @@ def get_strong_transform():
     return transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
-        RandAugment(n=2, m=10),
+        transforms.RandAugment(num_ops=2, magnitude=10),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.4914, 0.4822, 0.4465],
                              std=[0.2470, 0.2435, 0.2616]),
@@ -81,34 +56,33 @@ def get_strong_transform():
 
 
 # ──────────────────────────────────────────────
-# Dual-augmentation dataset wrapper
+# Dataset wrappers
 # ──────────────────────────────────────────────
 
 class DualAugDataset(Dataset):
     """Wraps a dataset to return (weak_aug, strong_aug, label) tuples."""
-    def __init__(self, base_dataset, indices=None):
-        self.base = base_dataset
+    def __init__(self, base_dataset, indices):
+        self.data = base_dataset.data
+        self.targets = base_dataset.targets
         self.indices = indices
         self.weak = get_weak_transform()
         self.strong = get_strong_transform()
 
     def __len__(self):
-        return len(self.indices) if self.indices is not None else len(self.base)
+        return len(self.indices)
 
     def __getitem__(self, idx):
-        real_idx = self.indices[idx] if self.indices is not None else idx
-        # Get the raw PIL image (need to access base dataset's data directly)
-        img = self.base.data[real_idx]
-        label = self.base.targets[real_idx]
-        from PIL import Image
-        img = Image.fromarray(img)
+        real_idx = self.indices[idx]
+        img = Image.fromarray(self.data[real_idx])
+        label = self.targets[real_idx]
         return self.weak(img), self.strong(img), label
 
 
 class LabeledDataset(Dataset):
     """Simple labeled dataset with weak augmentation only."""
     def __init__(self, base_dataset, indices):
-        self.base = base_dataset
+        self.data = base_dataset.data
+        self.targets = base_dataset.targets
         self.indices = indices
         self.transform = get_weak_transform()
 
@@ -117,10 +91,8 @@ class LabeledDataset(Dataset):
 
     def __getitem__(self, idx):
         real_idx = self.indices[idx]
-        img = self.base.data[real_idx]
-        label = self.base.targets[real_idx]
-        from PIL import Image
-        img = Image.fromarray(img)
+        img = Image.fromarray(self.data[real_idx])
+        label = self.targets[real_idx]
         return self.transform(img), label
 
 
@@ -131,7 +103,7 @@ class LabeledDataset(Dataset):
 def train_flexmatch(
     labeled_indices: list[int],
     num_classes: int = 10,
-    total_iterations: int = 100_000,
+    total_iterations: int = 25_000,
     batch_size: int = 64,
     mu: int = 7,
     lr: float = 0.03,
@@ -148,18 +120,8 @@ def train_flexmatch(
     """
     Train FlexMatch on CIFAR-10 with the given labeled indices.
 
-    Args:
-        labeled_indices: Indices of labeled examples.
-        total_iterations: Total training iterations (paper: 400k, ours: 100k).
-        batch_size: Labeled batch size.
-        mu: Unlabeled-to-labeled batch ratio.
-        threshold: Base confidence threshold for pseudo labels.
-        lambda_u: Weight for unsupervised loss.
-        ema_decay: EMA decay for teacher model.
-        eval_every: Evaluate on test set every N iterations.
-
     Returns:
-        Final test accuracy (%).
+        Best test accuracy (%).
     """
     if device is None:
         device = torch.device("cpu")
@@ -181,16 +143,23 @@ def train_flexmatch(
     labeled_ds = LabeledDataset(base_train, labeled_indices)
     unlabeled_ds = DualAugDataset(base_train, unlabeled_indices)
 
+    # FIX: batch_size capped to labeled set size, drop_last=False, num_workers=0
     labeled_loader = DataLoader(
-        labeled_ds, batch_size=batch_size, shuffle=True,
-        num_workers=2, drop_last=True,
+        labeled_ds,
+        batch_size=min(batch_size, len(labeled_indices)),
+        shuffle=True,
+        num_workers=0,
+        drop_last=False,
     )
     unlabeled_loader = DataLoader(
-        unlabeled_ds, batch_size=batch_size * mu, shuffle=True,
-        num_workers=2, drop_last=True,
+        unlabeled_ds,
+        batch_size=batch_size * mu,
+        shuffle=True,
+        num_workers=0,
+        drop_last=True,
     )
     test_loader = DataLoader(
-        test_dataset, batch_size=256, shuffle=False, num_workers=2
+        test_dataset, batch_size=256, shuffle=False, num_workers=0
     )
 
     # ── Model ──
@@ -206,14 +175,11 @@ def train_flexmatch(
         model.parameters(), lr=lr, momentum=momentum,
         weight_decay=weight_decay, nesterov=True
     )
-
-    # Cosine LR schedule
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer, T_max=total_iterations
     )
 
     # ── FlexMatch: per-class threshold tracking ──
-    # Track per-class learning status (sigma in the paper)
     classwise_acc = torch.zeros(num_classes, device=device)
 
     # ── Training loop ──
@@ -252,10 +218,8 @@ def train_flexmatch(
             max_probs, pseudo_labels = probs_uw.max(dim=1)
 
             # FlexMatch: per-class flexible thresholds
-            # Threshold for each sample based on its pseudo-label class
             flex_threshold = threshold * (classwise_acc[pseudo_labels] /
                                           (classwise_acc.max() + 1e-6))
-            # Ensure threshold doesn't go below a minimum
             flex_threshold = torch.clamp(flex_threshold, min=threshold * 0.5)
 
             # Mask: keep only confident pseudo-labels
@@ -284,7 +248,6 @@ def train_flexmatch(
                     class_mask = (pseudo_labels == c)
                     if class_mask.sum() > 0:
                         class_correct = (max_probs[class_mask] >= threshold).float().mean()
-                        # EMA update of class accuracy
                         classwise_acc[c] = 0.999 * classwise_acc[c] + 0.001 * class_correct
 
         # ── Logging & evaluation ──
@@ -294,14 +257,15 @@ def train_flexmatch(
             mask_ratio = mask.mean().item()
             print(f"    Iter {it+1}/{total_iterations} | "
                   f"Loss_l: {loss_l.item():.3f} | Loss_u: {loss_u.item():.3f} | "
-                  f"Mask: {mask_ratio:.2f} | Acc: {acc:.2f}% | Best: {best_acc:.2f}%")
+                  f"Mask: {mask_ratio:.2f} | Acc: {acc:.2f}% | Best: {best_acc:.2f}%",
+                  flush=True)
 
     # Final evaluation
     final_acc = evaluate(ema_model, test_loader, device)
     best_acc = max(best_acc, final_acc)
 
     if verbose:
-        print(f"    Final Acc: {final_acc:.2f}% | Best Acc: {best_acc:.2f}%")
+        print(f"    Final Acc: {final_acc:.2f}% | Best Acc: {best_acc:.2f}%", flush=True)
 
     return best_acc
 

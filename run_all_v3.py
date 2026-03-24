@@ -2,17 +2,18 @@
 run_all_v3.py — Framework 3: Semi-supervised (FlexMatch)
 
 Runs FlexMatch (Zhang et al., 2021) with labeled sets selected by
-different AL strategies.
+different AL strategies on CIFAR-10.
 
 Matches paper Section 4.2.3 / Fig. 6a:
-  - CIFAR-10 with 10 labeled examples
+  - 10 labeled examples
   - WideResNet-28-2
-  - 100k iterations (paper: 400k — reduced for compute, discussed in report)
+  - 25k iterations (paper: 400k — reduced for compute, discussed in report)
 
 Requires: models/simclr_features.npy (from run_all.py)
 
 Usage:
-    python run_all_v3.py
+    nohup python run_all_v3.py > output.log 2>&1 &
+    tail -f output.log
 """
 
 import time
@@ -35,26 +36,19 @@ import matplotlib.pyplot as plt
 # ══════════════════════════════════════════════
 # CONFIG
 # ══════════════════════════════════════════════
-BUDGET = 10                    # 10 labeled examples total (1 per class, matching Fig. 6a)
-FLEXMATCH_ITERATIONS = 100_000 # Paper: 400k — reduced for compute
-N_REPS = 1                     # Paper: 3 — reduced for compute
+BUDGET = 10                   # 10 labeled examples (1 per class, Fig. 6a)
+FLEXMATCH_ITERATIONS = 25_000 # Paper: 400k — reduced for compute
+N_REPS = 1                    # Paper: 3 — reduced for compute
 
-# Strategies to test (matching paper Fig. 6)
+# Key comparison: Random vs TypiClust (core finding of the paper)
 STRATEGIES = [
     "random",
     "typiclust",
-    "coreset",
-    "badge",
 ]
 # ══════════════════════════════════════════════
 
 
-def select_labeled_indices(
-    features: np.ndarray,
-    strategy: str,
-    budget: int,
-    seed: int = 42,
-) -> list[int]:
+def select_labeled_indices(features, strategy, budget, seed=42):
     """Select labeled indices using the given strategy (single round)."""
     return query(
         strategy=strategy,
@@ -78,13 +72,13 @@ def main():
         sys.exit(1)
 
     features = np.load(features_path)
-    print(f"Loaded features: {features.shape}")
+    print(f"Loaded features: {features.shape}", flush=True)
 
     # ── Run experiments ──
-    print("\n" + "=" * 70)
-    print("Framework 3: Semi-Supervised (FlexMatch)")
-    print(f"Budget: {BUDGET} labels | Iterations: {FLEXMATCH_ITERATIONS}")
-    print("=" * 70)
+    print(f"\n{'='*70}", flush=True)
+    print(f"Framework 3: Semi-Supervised (FlexMatch)", flush=True)
+    print(f"Budget: {BUDGET} labels | Iterations: {FLEXMATCH_ITERATIONS}", flush=True)
+    print(f"{'='*70}", flush=True)
 
     all_results = {}
 
@@ -93,14 +87,14 @@ def main():
         result_path = RESULTS_DIR / result_file
 
         if result_path.exists():
-            print(f"\n  {strategy}: results found, skipping.")
+            print(f"\n  {strategy}: results found, skipping.", flush=True)
             from src.utils import load_results
             all_results[strategy] = load_results(result_file)
             continue
 
-        print(f"\n{'─'*60}")
-        print(f"  Strategy: {strategy}")
-        print(f"{'─'*60}")
+        print(f"\n{'─'*60}", flush=True)
+        print(f"  Strategy: {strategy}", flush=True)
+        print(f"{'─'*60}", flush=True)
 
         rep_accuracies = []
 
@@ -109,18 +103,16 @@ def main():
             set_seed(seed)
 
             # Select labeled examples
-            labeled_indices = select_labeled_indices(
-                features, strategy, BUDGET, seed=seed
-            )
-            print(f"\n  Rep {rep+1}/{N_REPS} | Selected indices: {labeled_indices[:10]}...")
+            labeled_indices = select_labeled_indices(features, strategy, BUDGET, seed=seed)
+            print(f"\n  Rep {rep+1}/{N_REPS} | Selected indices: {labeled_indices}", flush=True)
 
             # Check class coverage
-            from torchvision import datasets
-            base = datasets.CIFAR10(root=str(DATA_DIR), train=True, download=True)
+            from torchvision import datasets as tv_datasets
+            base = tv_datasets.CIFAR10(root=str(DATA_DIR), train=True, download=True)
             selected_labels = [base.targets[i] for i in labeled_indices]
             n_classes_covered = len(set(selected_labels))
             print(f"    Classes covered: {n_classes_covered}/10 | "
-                  f"Labels: {sorted(selected_labels)}")
+                  f"Labels: {sorted(selected_labels)}", flush=True)
 
             # Train FlexMatch
             t0 = time.time()
@@ -135,10 +127,10 @@ def main():
                 device=device,
                 data_dir=str(DATA_DIR),
                 verbose=True,
-                eval_every=10_000,
+                eval_every=5000,
             )
             elapsed = (time.time() - t0) / 60
-            print(f"    Accuracy: {acc:.2f}% | Time: {elapsed:.1f} min")
+            print(f"    Accuracy: {acc:.2f}% | Time: {elapsed:.1f} min", flush=True)
             rep_accuracies.append(acc)
 
         results = {
@@ -153,54 +145,45 @@ def main():
         save_results(results, result_file)
         all_results[strategy] = results
 
-    # ── Generate plot (matching paper Fig. 6a style) ──
-    print("\n" + "=" * 70)
-    print("Generating Framework 3 plot")
-    print("=" * 70)
+    # ── Generate plot (bar chart matching paper Fig. 6a style) ──
+    print(f"\n{'='*70}", flush=True)
+    print("Generating Framework 3 plot", flush=True)
+    print(f"{'='*70}", flush=True)
 
-    fig, ax = plt.subplots(figsize=(8, 5))
+    fig, ax = plt.subplots(figsize=(6, 4.5))
 
     strategies_sorted = sorted(all_results.keys())
     x_pos = np.arange(len(strategies_sorted))
     means = [all_results[s]["mean_accuracy"] for s in strategies_sorted]
     stds = [all_results[s].get("std_accuracy", 0) for s in strategies_sorted]
 
-    colors = []
-    for s in strategies_sorted:
-        if s == "typiclust":
-            colors.append("tab:blue")
-        elif s == "random":
-            colors.append("tab:gray")
-        else:
-            colors.append("tab:orange")
+    colors = ["tab:blue" if s == "typiclust" else "tab:gray" for s in strategies_sorted]
 
     bars = ax.bar(x_pos, means, yerr=stds, capsize=5, color=colors, alpha=0.8)
     ax.set_xticks(x_pos)
-    ax.set_xticklabels([s.capitalize() for s in strategies_sorted], rotation=15)
+    ax.set_xticklabels([s.capitalize() for s in strategies_sorted])
     ax.set_ylabel("Test Accuracy (%)")
     ax.set_title(f"Framework 3: FlexMatch with {BUDGET} Labels (CIFAR-10)")
     ax.grid(True, alpha=0.3, axis="y")
 
-    # Add value labels on bars
     for bar, mean in zip(bars, means):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.5,
-                f"{mean:.1f}%", ha="center", va="bottom", fontsize=10)
+                f"{mean:.1f}%", ha="center", va="bottom", fontsize=11)
 
     plt.tight_layout()
     plt.savefig(str(FIGURES_DIR / "fig_fw3_flexmatch.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
     # ── Summary ──
-    print("\n" + "=" * 70)
-    print("FRAMEWORK 3 RESULTS")
-    print("=" * 70)
+    print(f"\n{'='*70}", flush=True)
+    print("FRAMEWORK 3 RESULTS", flush=True)
+    print(f"{'='*70}", flush=True)
     for s in strategies_sorted:
         r = all_results[s]
-        print(f"  {s:15s}: {r['mean_accuracy']:.2f}%"
-              + (f" ± {r['std_accuracy']:.2f}%" if r.get('std_accuracy', 0) > 0 else ""))
+        print(f"  {s:15s}: {r['mean_accuracy']:.2f}%", flush=True)
 
     total_min = (time.time() - total_start) / 60
-    print(f"\nTotal runtime: {total_min:.1f} min")
+    print(f"\nTotal runtime: {total_min:.1f} min", flush=True)
 
 
 if __name__ == "__main__":
