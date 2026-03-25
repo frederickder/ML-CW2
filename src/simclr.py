@@ -92,10 +92,6 @@ class NTXentLoss(nn.Module):
         mask = torch.eye(2 * batch_size, device=z.device, dtype=torch.bool)
         sim_matrix = sim_matrix.masked_fill(mask, -1e9)
 
-        # Positive pairs: (i, i+B) and (i+B, i)
-        pos_sim = torch.sum(z_i * z_j, dim=1) / self.temperature  # [B]
-        pos_sim = torch.cat([pos_sim, pos_sim], dim=0)  # [2B]
-
         # Loss = -log(exp(pos) / sum(exp(all_negatives)))
         # Using log-sum-exp trick via cross entropy
         # For each row i, the "label" is the index of its positive pair

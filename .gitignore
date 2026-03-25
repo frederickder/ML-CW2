@@ -89,7 +89,8 @@ data/
 
 # Results and models
 results/
-models/
+models/*
+!models/.gitkeep
 
 # Temporary files
 *.tmp

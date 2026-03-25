@@ -1,4 +1,4 @@
-# ML-CW2: Active Learning on a Budget — CIFAR-10 Reproduction
+# ML-CW2: Active Learning on a Budget
 
 Reproduction and extension of the TPC_RP algorithm from:
 
@@ -7,7 +7,7 @@ Reproduction and extension of the TPC_RP algorithm from:
 ## Project Structure
 
 ```
-typicclust-cifar10/
+ML-CW2/
 ├── README.md
 ├── requirements.txt
 ├── notebooks/
@@ -19,9 +19,12 @@ typicclust-cifar10/
 │   ├── __init__.py
 │   ├── simclr.py          # SimCLR model, loss, training loop
 │   ├── resnet.py           # ResNet-18 adapted for CIFAR-10 (32x32)
+│   ├── wideresnet.py       # WideResNet backbone used by FlexMatch
 │   ├── typicclust.py       # TypiClust algorithm (clustering + typicality)
 │   ├── active_learning.py  # AL loop: query → label → train → evaluate
+│   ├── strategies.py       # Active learning query strategies and baselines
 │   ├── classifier.py       # Supervised ResNet-18 classifier training
+│   ├── flexmatch.py        # FlexMatch semi-supervised training loop
 │   ├── augmentations.py    # SimCLR and classifier augmentation pipelines
 │   └── utils.py            # Device detection, seeding, logging, metrics
 ├── results/                # Saved experiment results (CSVs, JSONs)
@@ -34,28 +37,27 @@ typicclust-cifar10/
 ```bash
 pip install -r requirements.txt
 
-# Option 1: Run notebooks sequentially in Jupyter/Colab
-# Option 2: Run from command line
-python -m src.simclr --epochs 200 --batch-size 512
-python -m src.active_learning --strategy typiclust --budget 10 --rounds 5 --reps 3
+# Results were generated via these scripts (run sequentially):
+python run_all.py      # SimCLR training + FW1 TypiClust variants + Random
+python run_all_v2.py   # FW1 all baselines + FW2 all strategies
+python run_all_v3.py   # FW3 FlexMatch semi-supervised
 ```
 
 ## Hardware
 
-!!CHANGE THIS!!
-Tested on:
-- MacBook Air M2 (16GB) via MPS backend
-- Google Colab (T4 GPU) via CUDA
+Experiments were run on:
+- RunPod RTX 4090 (Frameworks 1 & 2, SimCLR training)
+- RunPod RTX 4000 Ada (Framework 3)
 
 Device selection is automatic: CUDA → MPS → CPU.
 
 ## Deviations from Paper
-!!CHANGE THIS!!
 | Parameter | Paper | Ours | Rationale |
 |-----------|-------|------|-----------|
-| SimCLR epochs | 500 | 200 | Compute constraints; accuracy impact discussed in report |
-| AL repetitions | 10 | 3-5 | Compute constraints; wider CIs noted |
-| Classifier epochs | 200 | 100 | Compute constraints |
+| SimCLR epochs | 500 | 500 | Matched |
+| Classifier epochs | 200 | 200 | Matched |
+| AL repetitions | 10 | 5 | Compute constraints; wider CIs noted in report |
+| FlexMatch iterations | 400k | 50k | Compute constraints; discussed in report |
 
 ## Modification (Task 3)
 

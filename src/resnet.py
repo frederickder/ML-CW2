@@ -16,19 +16,16 @@ import torch.nn as nn
 from torchvision.models import resnet18
 
 
-def cifar_resnet18(num_classes: int = 10, pretrained: bool = False) -> nn.Module:
+def cifar_resnet18(num_classes: int = 10) -> nn.Module:
     """
     ResNet-18 modified for CIFAR-10 sized inputs (32x32).
     
     Args:
         num_classes: Number of output classes.
-        pretrained: Whether to load ImageNet pretrained weights.
-                    For this coursework, we train from scratch (pretrained=False).
-    
     Returns:
         Modified ResNet-18 model.
     """
-    model = resnet18(pretrained=pretrained)
+    model = resnet18(weights=None)
 
     # Replace first conv: 7x7/2 → 3x3/1, no initial maxpool
     model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -48,7 +45,7 @@ def cifar_resnet18_backbone() -> tuple[nn.Module, int]:
     Returns:
         (backbone, feature_dim): The backbone model and its output dimension.
     """
-    model = resnet18(pretrained=False)
+    model = resnet18(weights=None)
 
     # CIFAR modifications
     model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)

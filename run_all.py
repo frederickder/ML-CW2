@@ -33,14 +33,14 @@ from src.utils import get_device, set_seed, MODELS_DIR, DATA_DIR, RESULTS_DIR, F
 # ══════════════════════════════════════════════
 # CONFIG — adjust these as needed
 # ══════════════════════════════════════════════
-SIMCLR_EPOCHS = 500       # Paper uses 500; bump if you have time
+SIMCLR_EPOCHS = 500
 SIMCLR_BATCH_SIZE = 512
 SIMCLR_LR = 0.4
 
-CLASSIFIER_EPOCHS = 200   # Paper uses 200
-BUDGET_PER_ROUND = 10     # B = M (number of classes)
+CLASSIFIER_EPOCHS = 200
+BUDGET_PER_ROUND = 10
 N_ROUNDS = 5
-N_REPS = 5                # Paper uses 10; bump to 5 if time allows
+N_REPS = 5
 
 TYPICALITY_VARIANTS = ["euclidean", "cosine", "lof", "kde"]
 # ══════════════════════════════════════════════
