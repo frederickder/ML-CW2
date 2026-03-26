@@ -290,7 +290,7 @@ def main():
     ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(str(FIGURES_DIR / "fig_fw2_all_strategies.png"), dpi=300, bbox_inches="tight")
+    plt.savefig(str(FIGURES_DIR / "fig_fw2_supported_strategies.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
     # ── Print full summary ──
