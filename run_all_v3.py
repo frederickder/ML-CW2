@@ -7,7 +7,8 @@ different AL strategies on CIFAR-10.
 Matches paper Section 4.2.3 / Fig. 6a:
   - 10 labeled examples
   - WideResNet-28-2
-  - 25k iterations (paper: 400k — reduced for compute, discussed in report)
+  - 50k iterations (paper: 400k — reduced for compute, discussed in report)
+  - 1 repetition (paper: 3 — reduced for compute, discussed in report)
 
 Requires: models/simclr_features.npy (from run_all.py)
 

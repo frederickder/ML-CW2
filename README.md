@@ -10,11 +10,15 @@ Reproduction and extension of the TPC_RP algorithm from:
 ML-CW2/
 ├── README.md
 ├── requirements.txt
+├── run_all.py
+├── run_all_v2.py
+├── run_all_v3.py
+├── report.tex
 ├── notebooks/
 │   ├── 01_simclr_training.ipynb        # Step 1: Train SimCLR on CIFAR-10
-│   ├── 02_typicclust_baseline.ipynb    # Step 2-3: TypiClust implementation + evaluation
-│   ├── 03_modification.ipynb           # Task 3: Modified typicality measures
-│   └── 04_analysis_and_plots.ipynb     # Report figures and statistical analysis
+│   ├── 02_typicclust_baseline.ipynb    # Baseline TypiClust/Random stage
+│   ├── 03_modification.ipynb           # Euclidean vs Cosine vs LOF modification
+│   └── 04_analysis_and_plots.ipynb     # Final report figures and statistics
 ├── src/
 │   ├── __init__.py
 │   ├── simclr.py          # SimCLR model, loss, training loop
@@ -27,9 +31,10 @@ ML-CW2/
 │   ├── flexmatch.py        # FlexMatch semi-supervised training loop
 │   ├── augmentations.py    # SimCLR and classifier augmentation pipelines
 │   └── utils.py            # Device detection, seeding, logging, metrics
-├── results/                # Saved experiment results (CSVs, JSONs)
-├── models/                 # Saved model checkpoints
-└── figures/                # Generated plots for the report
+├── results/                # Saved experiment results (JSON)
+├── models/                 # Saved model checkpoints / cached features
+├── figures/                # Generated plots for the report
+└── appendix_notebooks/     # PDF printouts of notebook code for the report appendix
 ```
 
 ## Quick Start
@@ -37,11 +42,13 @@ ML-CW2/
 ```bash
 pip install -r requirements.txt
 
-# Results were generated via these scripts (run sequentially):
-python run_all.py      # SimCLR training + FW1 TypiClust variants + Random
-python run_all_v2.py   # FW1 all baselines + FW2 all strategies
-python run_all_v3.py   # FW3 FlexMatch semi-supervised
+# Main report artifacts were generated via these scripts (run sequentially):
+python run_all.py      # SimCLR training + features + FW1 TypiClust/Random + modification runs
+python run_all_v2.py   # FW1 baselines + FW2 supported feature-based comparisons
+python run_all_v3.py   # FW3 FlexMatch sanity check (Random vs TypiClust)
 ```
+
+The long runs were executed on RunPod GPUs. The notebooks mirror the corresponding stages and reload the saved artifacts for analysis and appendix printouts.
 
 ## Hardware
 
@@ -56,8 +63,9 @@ Device selection is automatic: CUDA → MPS → CPU.
 |-----------|-------|------|-----------|
 | SimCLR epochs | 500 | 500 | Matched |
 | Classifier epochs | 200 | 200 | Matched |
-| AL repetitions | 10 | 5 | Compute constraints; wider CIs noted in report |
-| FlexMatch iterations | 400k | 50k | Compute constraints; discussed in report |
+| AL repetitions (FW1/FW2) | 10 | 5 | Compute constraints; wider CIs noted in report |
+| FlexMatch repetitions (FW3) | 3 | 1 | Reduced compute budget; treated as qualitative only |
+| FlexMatch iterations (FW3) | 400k | 50k | Compute constraints; discussed in report |
 
 ## Modification (Task 3)
 
@@ -65,6 +73,5 @@ We evaluate alternative typicality measures:
 1. **Baseline**: Inverse mean Euclidean distance to K-NN (paper's method)
 2. **Cosine typicality**: Inverse mean cosine distance to K-NN
 3. **Local Outlier Factor (LOF)**: Density-based outlier score (inverted)
-4. **Kernel Density Estimation (KDE)**: Gaussian KDE score
 
-See `notebooks/03_modification.ipynb` for implementation and evaluation.
+The final report discusses Euclidean, Cosine, and LOF only. See `notebooks/03_modification.ipynb` for the aligned implementation and evaluation.
