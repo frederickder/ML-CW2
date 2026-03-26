@@ -264,13 +264,14 @@ def main():
     plt.savefig(str(FIGURES_DIR / "fig_fw1_all_strategies.png"), dpi=300, bbox_inches="tight")
     plt.close()
 
-    # ── Plot: Framework 2 — All strategies ──
+    # ── Plot: Framework 2 — supported feature-based strategies only ──
     fig, ax = plt.subplots(figsize=(10, 6))
     strategies_fw2 = {}
     for key, r in all_results.items():
         if key.startswith("fw2_"):
             name = key.replace("fw2_", "").replace("_b10", "")
-            strategies_fw2[name] = r
+            if name in ("typiclust", "random", "coreset"):
+                strategies_fw2[name] = r
 
     for i, (name, r) in enumerate(sorted(strategies_fw2.items())):
         b = r["cumulative_budget"]
@@ -285,8 +286,8 @@ def main():
 
     ax.set_xlabel("Cumulative Budget")
     ax.set_ylabel("Test Accuracy (%)")
-    ax.set_title("Framework 2: Self-Supervised Embedding — All Strategies (CIFAR-10)")
-    ax.legend(ncol=2, fontsize=9)
+    ax.set_title("Framework 2: Self-Supervised Embedding — Supported Feature-Based Strategies")
+    ax.legend(fontsize=10)
     ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(str(FIGURES_DIR / "fig_fw2_all_strategies.png"), dpi=300, bbox_inches="tight")
@@ -299,6 +300,8 @@ def main():
 
     for key in sorted(all_results.keys()):
         r = all_results[key]
+        if "se_accuracy" not in r or "cumulative_budget" not in r:
+            continue
         m = r["mean_accuracy"]
         s = r["se_accuracy"]
         b = r["cumulative_budget"]
